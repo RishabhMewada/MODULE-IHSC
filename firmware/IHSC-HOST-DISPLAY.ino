@@ -1,0 +1,393 @@
+"""
+=============================================================
+  host_display.py  —  PC-side thermal viewer
+  Reads binary frames from XIAO RP2040 over USB-CDC
+  Renders rainbow heatmap at up to 30 fps using OpenCV
+=============================================================
+
+Requirements:
+    pip install opencv-python numpy pyserial
+
+Usage:
+    python host_display.py --port COM3          (Windows)
+    python host_display.py --port /dev/ttyACM0  (Linux/Mac)
+    python host_display.py --port /dev/tty.usbmodem* (Mac)
+
+Auto-detection:
+    python host_display.py   (will try to find the RP2040 automatically)
+
+Controls in the display window:
+    Q / ESC  — quit
+    S        — save snapshot (PNG)
+    F        — toggle full-screen
+    +/-      — increase/decrease interpolation scale
+    P        — toggle temperature overlay
+    C        — cycle colour maps (Rainbow → Inferno → Plasma → Bone)
+    R        — reset min/max range lock
+    L        — lock current min/max range
+=============================================================
+"""
+
+import argparse
+import struct
+import sys
+import time
+from pathlib import Path
+
+import cv2
+import numpy as np
+import serial
+import serial.tools.list_ports
+
+# ──────────────────────────────────────────────
+#  Protocol constants (must match main.py)
+# ──────────────────────────────────────────────
+MAGIC        = 0xDEADBEEF
+FRAME_WIDTH  = 32
+FRAME_HEIGHT = 24
+N_PIXELS     = FRAME_WIDTH * FRAME_HEIGHT
+HEADER_FMT   = "<IHHIII"
+HEADER_SIZE  = struct.calcsize(HEADER_FMT)   # 20
+PIXEL_BYTES  = N_PIXELS * 2                  # 1536
+FOOTER_SIZE  = 2                             # checksum uint16
+FRAME_SIZE   = HEADER_SIZE + PIXEL_BYTES + FOOTER_SIZE   # 1558
+
+# ──────────────────────────────────────────────
+#  Display settings
+# ──────────────────────────────────────────────
+DEFAULT_SCALE   = 12          # 32*12=384 × 24*12=288 output window
+INTERP_METHOD   = cv2.INTER_CUBIC   # smooth upscale
+WINDOW_TITLE    = "Thermal Camera — XIAO RP2040 + MLX90640"
+
+COLORMAPS = [
+    ("Rainbow",  cv2.COLORMAP_RAINBOW),
+    ("Inferno",  cv2.COLORMAP_INFERNO),
+    ("Plasma",   cv2.COLORMAP_PLASMA),
+    ("Bone",     cv2.COLORMAP_BONE),
+    ("Jet",      cv2.COLORMAP_JET),
+]
+
+
+# ══════════════════════════════════════════════
+#  Auto-detect RP2040 serial port
+# ══════════════════════════════════════════════
+def find_rp2040_port():
+    candidates = []
+    for port in serial.tools.list_ports.comports():
+        desc = (port.description or "").lower()
+        mfr  = (port.manufacturer or "").lower()
+        if any(k in desc or k in mfr for k in
+               ("xiao", "rp2040", "raspberry pi", "micropython", "pico")):
+            candidates.append(port.device)
+    if candidates:
+        print(f"[AUTO] Found RP2040 at: {candidates[0]}")
+        return candidates[0]
+    # Fallback — first ACM/USB-serial device
+    for port in serial.tools.list_ports.comports():
+        if "ACM" in port.device or "usbmodem" in port.device:
+            return port.device
+    return None
+
+
+# ══════════════════════════════════════════════
+#  Frame reader
+# ══════════════════════════════════════════════
+class FrameReader:
+    def __init__(self, ser: serial.Serial):
+        self.ser = ser
+        self._buf = bytearray()
+
+    def _fill(self, n):
+        while len(self._buf) < n:
+            chunk = self.ser.read(self.ser.in_waiting or 1)
+            if chunk:
+                self._buf.extend(chunk)
+
+    def _sync(self):
+        """Scan stream until the 4-byte magic is found."""
+        magic_bytes = struct.pack("<I", MAGIC)
+        while True:
+            self._fill(4)
+            idx = bytes(self._buf).find(magic_bytes)
+            if idx == 0:
+                return True
+            if idx > 0:
+                del self._buf[:idx]
+            else:
+                del self._buf[:len(self._buf) - 3]
+
+    def read_frame(self):
+        """
+        Returns (temps_2d_array, t_min, t_max, frame_idx) or None on error.
+        temps_2d_array shape: (24, 32) float32 degrees C
+        """
+        if not self._sync():
+            return None
+
+        # Read full frame
+        self._fill(FRAME_SIZE)
+        data = bytes(self._buf[:FRAME_SIZE])
+        del self._buf[:FRAME_SIZE]
+
+        # Parse header
+        try:
+            magic, w, h, frame_idx, t_min_mC, t_max_mC = \
+                struct.unpack_from(HEADER_FMT, data, 0)
+        except struct.error:
+            return None
+
+        if magic != MAGIC or w != FRAME_WIDTH or h != FRAME_HEIGHT:
+            return None
+
+        # Parse pixels
+        pixel_data = data[HEADER_SIZE: HEADER_SIZE + PIXEL_BYTES]
+        ck_recv = struct.unpack_from("<H", data, HEADER_SIZE + PIXEL_BYTES)[0]
+
+        ck_calc = sum(pixel_data) & 0xFFFF
+        if ck_calc != ck_recv:
+            print(f"[WARN] Checksum mismatch frame {frame_idx}: "
+                  f"got {ck_recv:#06x} expected {ck_calc:#06x}")
+            return None
+
+        temps_flat = np.frombuffer(pixel_data, dtype=np.uint16).astype(np.float32)
+        temps_flat = temps_flat / 100.0 - 40.0   # decode: (v/100) - 40
+
+        temps_2d = temps_flat.reshape((FRAME_HEIGHT, FRAME_WIDTH))
+        t_min = t_min_mC / 1000.0
+        t_max = t_max_mC / 1000.0
+
+        return temps_2d, t_min, t_max, frame_idx
+
+
+# ══════════════════════════════════════════════
+#  Renderer
+# ══════════════════════════════════════════════
+class ThermalRenderer:
+    def __init__(self, scale=DEFAULT_SCALE):
+        self.scale      = scale
+        self.cm_idx     = 0          # Rainbow by default
+        self.show_temp  = True
+        self.fullscreen = False
+        self.range_lock = False
+        self.lock_min   = 20.0
+        self.lock_max   = 40.0
+        self._frame_count = 0
+        self._t0          = time.time()
+        self._fps_display = 0.0
+        self._snap_dir = Path("snapshots")
+
+    # ── rainbow colour map (custom, matches typical thermal cameras) ──
+    @staticmethod
+    def _apply_rainbow(norm_img):
+        """
+        Apply a vivid rainbow palette:
+          cold (0.0) → violet/blue
+          warm (1.0) → red
+        Returns BGR uint8 image.
+        """
+        # norm_img: float32 0.0–1.0, shape (H, W)
+        h, w = norm_img.shape
+        out = np.zeros((h, w, 3), dtype=np.uint8)
+
+        # Hue spans 240° (blue) → 0° (red) as temperature rises
+        # HSV: hue = (1 - norm) * 240
+        hue = ((1.0 - norm_img) * 240.0).astype(np.uint8)
+        ones = np.full((h, w), 255, dtype=np.uint8)
+        hsv = cv2.merge([hue, ones, ones])
+        out = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+        return out
+
+    def render(self, temps_2d, t_min, t_max, frame_idx):
+        if self.range_lock:
+            lo, hi = self.lock_min, self.lock_max
+        else:
+            lo, hi = t_min, t_max
+
+        # Normalise
+        span = max(hi - lo, 0.5)
+        norm = np.clip((temps_2d - lo) / span, 0.0, 1.0).astype(np.float32)
+
+        # Upscale (bicubic)
+        out_w = FRAME_WIDTH  * self.scale
+        out_h = FRAME_HEIGHT * self.scale
+        norm_up = cv2.resize(norm, (out_w, out_h), interpolation=INTERP_METHOD)
+
+        # Colour map
+        cm_name, cm_id = COLORMAPS[self.cm_idx]
+        if cm_name == "Rainbow":
+            coloured = self._apply_rainbow(norm_up)
+        else:
+            gray = (norm_up * 255).astype(np.uint8)
+            coloured = cv2.applyColorMap(gray, cm_id)
+
+        # Overlay: temperature scale bar
+        coloured = self._draw_scalebar(coloured, lo, hi)
+
+        # Overlay: min/max crosshairs
+        coloured = self._draw_minmax(coloured, temps_2d, lo, hi)
+
+        # Overlay: FPS + frame info
+        self._frame_count += 1
+        now = time.time()
+        if now - self._t0 >= 1.0:
+            self._fps_display = self._frame_count / (now - self._t0)
+            self._frame_count = 0
+            self._t0 = now
+
+        cv2.putText(coloured,
+                    f"FPS: {self._fps_display:.1f}  Frame: {frame_idx}  CM: {cm_name}",
+                    (8, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1,
+                    cv2.LINE_AA)
+
+        if self.range_lock:
+            cv2.putText(coloured, "RANGE LOCKED",
+                        (8, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 255), 1,
+                        cv2.LINE_AA)
+
+        return coloured
+
+    def _draw_scalebar(self, img, t_min, t_max):
+        h, w = img.shape[:2]
+        bar_h = h - 40
+        bar_w = 20
+        bar_x = w - 35
+
+        # Draw gradient bar
+        for y in range(bar_h):
+            frac = 1.0 - y / bar_h
+            hue = int((1.0 - frac) * 240)
+            hsv_px = np.array([[[hue, 255, 255]]], dtype=np.uint8)
+            bgr = cv2.cvtColor(hsv_px, cv2.COLOR_HSV2BGR)[0, 0]
+            cv2.line(img, (bar_x, y + 20), (bar_x + bar_w, y + 20),
+                     bgr.tolist(), 1)
+
+        # Labels
+        cv2.putText(img, f"{t_max:.1f}C",
+                    (bar_x - 10, 32), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.35, (255, 255, 255), 1, cv2.LINE_AA)
+        cv2.putText(img, f"{t_min:.1f}C",
+                    (bar_x - 10, bar_h + 18), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.35, (255, 255, 255), 1, cv2.LINE_AA)
+        return img
+
+    def _draw_minmax(self, img, temps_2d, t_min, t_max):
+        out_h, out_w = img.shape[:2]
+        sx = out_w / FRAME_WIDTH
+        sy = out_h / FRAME_HEIGHT
+
+        # Max (hottest)
+        max_idx = np.unravel_index(np.argmax(temps_2d), temps_2d.shape)
+        mx = int(max_idx[1] * sx + sx / 2)
+        my = int(max_idx[0] * sy + sy / 2)
+        cv2.drawMarker(img, (mx, my), (0, 0, 255),
+                       cv2.MARKER_CROSS, 14, 2, cv2.LINE_AA)
+        cv2.putText(img, f"{t_max:.1f}C",
+                    (mx + 6, my - 6), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.4, (0, 0, 255), 1, cv2.LINE_AA)
+
+        # Min (coldest)
+        min_idx = np.unravel_index(np.argmin(temps_2d), temps_2d.shape)
+        nx = int(min_idx[1] * sx + sx / 2)
+        ny = int(min_idx[0] * sy + sy / 2)
+        cv2.drawMarker(img, (nx, ny), (255, 200, 0),
+                       cv2.MARKER_CROSS, 14, 2, cv2.LINE_AA)
+        cv2.putText(img, f"{t_min:.1f}C",
+                    (nx + 6, ny - 6), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.4, (255, 200, 0), 1, cv2.LINE_AA)
+
+        return img
+
+    def save_snapshot(self, frame_img, frame_idx):
+        self._snap_dir.mkdir(exist_ok=True)
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        path = self._snap_dir / f"thermal_{ts}_f{frame_idx}.png"
+        cv2.imwrite(str(path), frame_img)
+        print(f"[SNAP] Saved {path}")
+
+    def handle_key(self, key, frame_img, frame_idx, t_min, t_max):
+        """Returns False to quit."""
+        if key in (ord('q'), ord('Q'), 27):
+            return False
+        if key in (ord('s'), ord('S')):
+            self.save_snapshot(frame_img, frame_idx)
+        if key in (ord('f'), ord('F')):
+            self.fullscreen = not self.fullscreen
+            flag = cv2.WINDOW_FULLSCREEN if self.fullscreen else cv2.WINDOW_NORMAL
+            cv2.setWindowProperty(WINDOW_TITLE, cv2.WND_PROP_FULLSCREEN, flag)
+        if key == ord('+') or key == ord('='):
+            self.scale = min(self.scale + 2, 30)
+        if key == ord('-') or key == ord('_'):
+            self.scale = max(self.scale - 2, 4)
+        if key in (ord('p'), ord('P')):
+            self.show_temp = not self.show_temp
+        if key in (ord('c'), ord('C')):
+            self.cm_idx = (self.cm_idx + 1) % len(COLORMAPS)
+        if key in (ord('l'), ord('L')):
+            self.range_lock = True
+            self.lock_min = t_min
+            self.lock_max = t_max
+            print(f"[LOCK] Range locked {t_min:.1f}–{t_max:.1f} °C")
+        if key in (ord('r'), ord('R')):
+            self.range_lock = False
+            print("[LOCK] Range auto")
+        return True
+
+
+# ══════════════════════════════════════════════
+#  Entry point
+# ══════════════════════════════════════════════
+def main():
+    parser = argparse.ArgumentParser(description="Thermal Camera Viewer")
+    parser.add_argument("--port",  default=None,
+                        help="Serial port (e.g. COM3 or /dev/ttyACM0)")
+    parser.add_argument("--baud",  type=int, default=115200,
+                        help="Baud rate (default 115200, USB-CDC ignores this)")
+    parser.add_argument("--scale", type=int, default=DEFAULT_SCALE,
+                        help=f"Display scale factor (default {DEFAULT_SCALE})")
+    args = parser.parse_args()
+
+    port = args.port or find_rp2040_port()
+    if port is None:
+        print("[ERROR] Could not find RP2040. Specify --port explicitly.")
+        sys.exit(1)
+
+    print(f"[OPEN] Connecting to {port} …")
+    try:
+        ser = serial.Serial(port, args.baud, timeout=0.1)
+    except serial.SerialException as e:
+        print(f"[ERROR] {e}")
+        sys.exit(1)
+
+    reader   = FrameReader(ser)
+    renderer = ThermalRenderer(scale=args.scale)
+
+    cv2.namedWindow(WINDOW_TITLE, cv2.WINDOW_NORMAL)
+    print("[READY] Press Q to quit, S to snapshot, C to change colourmap, "
+          "L to lock range, R to reset.")
+
+    t_min_global = 20.0
+    t_max_global = 40.0
+    frame_idx    = 0
+
+    while True:
+        result = reader.read_frame()
+        if result is None:
+            time.sleep(0.001)
+            continue
+
+        temps_2d, t_min, t_max, frame_idx = result
+
+        frame_img = renderer.render(temps_2d, t_min, t_max, frame_idx)
+        cv2.imshow(WINDOW_TITLE, frame_img)
+
+        key = cv2.waitKey(1) & 0xFF
+        if not renderer.handle_key(key, frame_img, frame_idx, t_min, t_max):
+            break
+
+    cv2.destroyAllWindows()
+    ser.close()
+    print("[EXIT] Closed.")
+
+
+if __name__ == "__main__":
+    main()

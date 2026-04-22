@@ -1,0 +1,13 @@
+Name,Purpose,Quantity,Total Cost (USD),Link,Distributor
+" PCB","pcb.its 8 dollars because i am also ordering pcb for my project side by side to reduce tax cost and shipping costs ",5,8.00,"https://cart.jlcpcb.com/shopcart/cart/","JLPCB"
+"soldering flux","flux",1,0.27,"https://robu.in/product/noel-flux-soldering-paste-10g","Robu.in"
+"MLX90640","heat camera",1,37.48,"https://www.digikey.in/en/products/detail/melexis-technologies-nv/MLX90640ESF-BAA-000-SP/8638465","Digikey.in"
+"XIAO RP2040","MCU",1,6.41,"https://robocraze.com/products/seeed-studio-xiao-rp2040-development-board?variant=47742255562976&country=IN&currency=INR&campaignid=23145906364&adgroupid=182236965810&keyword=&device=c&gad_campaignid=23145906364","Robocraze.in"
+"Buzzer-BZ1","beep beep.",1,0.15,"https://robu.in/product/3v-active-electromagnetic-buzzer-pack-of-5","Robu.in"
+"1x4 pin header","would cut the 10 pin into 4 (J1)",1,0.14,"https://robu.in/product/ds1022-22-1x10ruf1-a3-0-b6-0-c6-0-b-connfly-1x10-pin-2-54mm-pin-header-r-a-type-h2-0mm","Robu.in"
+"low profile tactile switch SMD","switch.",1,0.11,"https://robu.in/product/tsc008a1718a-bzcn-4x4x1-7mm-50ma-round-button-50gf-12v-smd-tactile-switches-rohs","Robu.in"
+"Resistors","R2-4.7K Ohm",2,0.11,"https://robu.in/product/4-7k-ohm-1-4w-0603-surface-mount-chip-resistor-pack-of-100","Robu.in"
+"Resistors","R1-1k Ohm",1,0.11,"https://robu.in/product/1k-ohm-1-4w-0805-surface-mount-chip-resistor-pack-of-10","Robu.in"
+"capacitors","C1-100nF",1,0.12,"https://robu.in/product/cs2012x7r106m100nre-samwha-10v-10uf-x7r-%c2%b120-0805-multilayer-ceramic-capacitors-mlcc-smd-smt-rohs","Robu.in"
+"capacitors","C3-1uF",1,0.11,"https://robu.in/product/1uf-1000nf-50v-capacitor-0603-smd-package-pack-of-20","Robu.in"
+"Capacitors","C2-10uF",1,0.11," https://robu.in/product/100nf-0805-surface-mount-multilayer-ceramic-capacitor-pack-of-40","Robu.in"

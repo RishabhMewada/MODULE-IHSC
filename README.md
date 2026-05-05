@@ -29,7 +29,7 @@ things considerd in mind to make it happen
 ## Features
 
  <p align="center">
- <img width="1024" height="1536" alt="Flowchart" src="https://github.com/user-attachments/assets/062e7571-7452-4109-9c1e-cc33dfc627fd" />
+
 </p>
 
 
@@ -69,17 +69,17 @@ All PCB source files are available in `/hardware/kicad`.
 ## Firmware
 
 
-- Thermal Sensing
+- Thermal Sensing camera
 
-*Raw MLX90640 32×24 thermal array (768 pixels) connected directly via I2C
-110° wide field of view
-−40 °C to +300 °C measurement range
+*Raw MLX90640 32×24 thermal array with 768 pixels, connected directly via I2C
+with 110° wide field of view built into the camera
+and have the abillity to measure −40 °C to +300 °C measurement range
 Dual I2C bus architecture — sensor on I2C1 (GP6/GP7), display on I2C0 (GP4/GP5) to prevent bus conflicts*
 
 - Rainbow Heatmap
 
 *Full 7-stop rainbow colour mapping (violet → blue → cyan → green → yellow → orange → red)
-Bicubic interpolation upscaling from 32×24 to full display resolution
+Bicubic interpolation upscaling from 32×24 to full display resolution which will convert it into 
 Real-time hotspot and coldspot crosshair overlays with temperature labels
 Live temperature scale bar rendered on-screen*
 
@@ -89,10 +89,10 @@ Live temperature scale bar rendered on-screen*
 
 - Dual Output System
 
-*USB-CDC mode — binary frame stream over Type-C cable to a PC host viewer
+*USB-CDC mode — binary frame stream over via a Type-C cable to a PC host viewer
 I2C display mode — frames rendered directly onto an external OLED via the 4-pin PCB connector (SSD1306 128×64 or SH1107 128×128)
 BOTH mode — simultaneous USB stream and I2C display output
-Smart startup auto-detection: defaults to BOTH if display and USB host are both detected, I2C-only if no PC is connected, USB if no display is found*
+Smart startup auto-detection: defaults to BOTH if display and USB host are both detected, I2C is used only if no PC is connected or USB if no display is found*
 
 - Output Switching
 
@@ -103,30 +103,29 @@ Soft-reset trigger from PC so new mode activates immediately without unplugging*
 
 - PC Host Viewer (host_display.py)
 
-*Live OpenCV window with rainbow heatmap at up to 30 fps
+*Live OpenCV window with rainbow heatmap whit support up to 30 fps
 Bicubic interpolation for smooth upscaled display
 Adjustable window scale factor
-Cycle through 5 colour maps: Rainbow, Inferno, Plasma, Bone, Jet
-Temperature range lock/unlock (freeze min–max for consistent colour mapping)
-Hotspot and coldspot crosshairs with live °C labels
-PNG snapshot saving with timestamp
+and it Cycle's through 5 colour maps: Rainbow, Inferno, Plasma, Bone, Jet
+and the Temperature range lock/unlock (freeze min–max for consistent colour mapping)
+and shows Hotspot and coldspot crosshairs with live °C labels and it has a 
 Full-screen toggle
 Live FPS counter and frame index overlay*
 
 - PC Switch Utility (display_switch.py)
 
-*Query current output mode from the device
-Switch output mode (USB / I2C / BOTH) via command line
-Scan the 4-pin I2C connector bus to detect connected display hardware
-Live frame monitor — prints per-frame FPS, Tmin, Tmax, and checksum status
+*Query current output mode from the device which 
+Switchs to the output mode (USB / I2C / BOTH) via command line and
+Scan the 4-pin I2C connector bus to detect connected display hardware and then
+ the Live frame monitor — prints per-frame FPS, Tmin, Tmax, and checksum status and it also
 Auto-detects RP2040 serial port (no --port flag needed in most cases)*
 
 - Performance
 
-*~30 fps live thermal stream at 32 Hz sensor refresh rate
-USB-CDC frame size: 1562 bytes per frame (~47 KB/s, well within USB bandwidth)
-Binary framing protocol with magic header and checksum validation for data integrity
-Frame index tracking for dropped frame detection*
+*~30 fps live thermal stream at 32 Hz sensor refresh rate in the MLX90640 camera
+-USB-CDC frame size: 1562 bytes per frame (~47 KB/s, well within USB bandwidth)
+ and uses Binary framing protocol with magic header and checksum validation for data integrity
+and Frame index tracking for dropped frame detection*
 
 - Hardware Controls
 

@@ -1,5 +1,5 @@
 # MODULE-IHSC
-A thermal imaging module consisting of XIAO RP2040 &amp; WAVESHARE MLX90640 for thermal camera and XIAO for the onboard processing 
+A thermal imaging module consisting of XIAO RP2040 &amp; MLX90640 for thermal camera and XIAO for the onboard processing 
 which supports usb type c streaming and usb screen sharing extension via an 4 pin I2C extension
 
  <p align="center">

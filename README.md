@@ -168,7 +168,29 @@ Manufacturing & sourcing:
   <p align="center">
    <img width="771" height="679" alt="Screenshot 2026-04-22 172205" src="https://github.com/user-attachments/assets/9aa9b383-118e-4b00-bc3a-61cb0a58a8b1" />
 </p>
-  
+
+
+## Bill of Materials
+
+| Name | Quantity | Total Cost (USD) | Distributor | Link |
+|------|----------|-----------------|-------------|------|
+| PCB | 5 | $8.00 | JLCPCB | [Buy](https://cart.jlcpcb.com/shopcart/cart/) |
+| Soldering Flux | 1 | $0.27 | Robu.in | [Buy](https://robu.in/product/noel-flux-soldering-paste-10g) |
+| MLX90640 | 1 | $37.48 | Digikey.in | [Buy](https://www.digikey.in/en/products/detail/melexis-technologies-nv/MLX90640ESF-BAA-000-SP/8638465) |
+| XIAO RP2040 | 1 | $6.41 | Robocraze.in | [Buy](https://robocraze.com/products/seeed-studio-xiao-rp2040-development-board?variant=47742255562976&country=IN&currency=INR&campaignid=23145906364&adgroupid=182236965810&keyword=&device=c&gad_campaignid=23145906364) |
+| Buzzer (BZ1) | 1 | $0.15 | Robu.in | [Buy](https://robu.in/product/3v-active-electromagnetic-buzzer-pack-of-5) |
+| 1×4 Pin Header (J1) | 1 | $0.14 | Robu.in | [Buy](https://robu.in/product/ds1022-22-1x10ruf1-a3-0-b6-0-c6-0-b-connfly-1x10-pin-2-54mm-pin-header-r-a-type-h2-0mm) |
+| Low Profile Tactile Switch SMD | 1 | $0.11 | Robu.in | [Buy](https://robu.in/product/tsc008a1718a-bzcn-4x4x1-7mm-50ma-round-button-50gf-12v-smd-tactile-switches-rohs) |
+| Resistor 4.7 kΩ 0603 (R2) | 2 | $0.11 | Robu.in | [Buy](https://robu.in/product/4-7k-ohm-1-4w-0603-surface-mount-chip-resistor-pack-of-100) |
+| Resistor 1 kΩ 0805 (R1) | 1 | $0.11 | Robu.in | [Buy](https://robu.in/product/1k-ohm-1-4w-0805-surface-mount-chip-resistor-pack-of-10) |
+| Capacitor 100 nF 0805 (C1) | 1 | $0.12 | Robu.in | [Buy](https://robu.in/product/cs2012x7r106m100nre-samwha-10v-10uf-x7r-%c2%b120-0805-multilayer-ceramic-capacitors-mlcc-smd-smt-rohs) |
+| Capacitor 1 µF 0603 (C3) | 1 | $0.11 | Robu.in | [Buy](https://robu.in/product/1uf-1000nf-50v-capacitor-0603-smd-package-pack-of-20) |
+| Capacitor 10 µF 0805 (C2) | 1 | $0.11 | Robu.in | [Buy](https://robu.in/product/100nf-0805-surface-mount-multilayer-ceramic-capacitor-pack-of-40) |
+| **Total** | | **$77.81** | | |
+
+
+please note that most of the parts are from indian suppliers !
+
 -------------------------------------------------------------------------------------------------
 ## License
 This project is open-source hardware and software and is released under the **MIT License**.

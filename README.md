@@ -186,10 +186,13 @@ Manufacturing & sourcing:
 | Capacitor 100 nF 0805 (C1) | 1 | $0.12 | Robu.in | [Buy](https://robu.in/product/cs2012x7r106m100nre-samwha-10v-10uf-x7r-%c2%b120-0805-multilayer-ceramic-capacitors-mlcc-smd-smt-rohs) |
 | Capacitor 1 µF 0603 (C3) | 1 | $0.11 | Robu.in | [Buy](https://robu.in/product/1uf-1000nf-50v-capacitor-0603-smd-package-pack-of-20) |
 | Capacitor 10 µF 0805 (C2) | 1 | $0.11 | Robu.in | [Buy](https://robu.in/product/100nf-0805-surface-mount-multilayer-ceramic-capacitor-pack-of-40) |
+| 2N2219 Transistor | 1 | $ | link |
 | **Total** | | **$77.81** | | |
 
 
 please note that most of the parts are from indian suppliers !
+
+*note there's also a transistor in the project (2N2219) but it's not available anywhere online for me that's why it's not included in the BOM with price and link
 
 -------------------------------------------------------------------------------------------------
 ## License

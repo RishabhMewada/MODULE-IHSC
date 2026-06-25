@@ -151,9 +151,20 @@ Firmware files are located in `/firmware`.
 
 -------------------------------------------------------------------------------------------------
 ## Images
-<img width="893" height="674" alt="PCB" src="https://github.com/user-attachments/assets/68275bd9-c720-4739-8690-97e84e6b5463" />
 
-<img width="651" height="761" alt="PCB-4" src="https://github.com/user-attachments/assets/3ad33133-2df3-48a8-bab6-9f5a8320f6ff" />
+ <p align="center">
+    <img width="893" height="674" alt="PCB" src="https://github.com/user-attachments/assets/68275bd9-c720-4739-8690-97e84e6b5463" />
+</p>
+ 
+
+ <p align="center">
+    <img width="697" height="818" alt="Screenshot 2026-06-25 164149" src="https://github.com/user-attachments/assets/19e4a537-0c1e-4cde-9f96-2763d425d8b7" />
+</p>
+
+<p align="center">
+     <img width="1487" height="808" alt="Screenshot 2026-06-25 164611" src="https://github.com/user-attachments/assets/c93d9f8e-5836-4b0d-9b41-769d4602c4ff" />
+</p>
+
 
 -------------------------------------------------------------------------------------------------
 ## BOM
